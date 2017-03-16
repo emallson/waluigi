@@ -1,0 +1,25 @@
+---
+name: "interdict-validate"
+bin: "target/release/interdict-validate"
+format: '<graph> <epsilon> <delta> <seeds> <edges> --threads <threads> --log <log>'
+outputs:
+  original_influence:
+    msg: "influence"
+    aka: ["original"]
+  result_influence:
+    msg: "influence"
+    aka: ["result"]
+  influence_ratio:
+    msg: "influence"
+    aka: ["ratio"]
+fields:
+  graph:
+    type: path
+  epsilon:
+    type: float
+  delta:
+    type: float
+  seeds:
+    type: str
+  edges:
+    type: str

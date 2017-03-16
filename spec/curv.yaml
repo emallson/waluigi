@@ -1,0 +1,30 @@
+---
+name: curv
+bin: target/release/curv
+format: 'solve-ratio <problem> <graph> <k> <delta> <delta2> <epsilon> --threads <threads> --log <log> --quiet'
+outputs:
+  ratio: # by default, the field: is set to the name of the object, so for this one field: "ratio" is implicit
+    msg: "approximation ratio"
+fields:
+  problem:
+    type: str
+  graph:
+    type: path
+  k:
+    type: uint
+  delta:
+    type: float
+    aka: ["δ"]
+  delta2:
+    type: float
+    aka: ["δ₂"]
+  epsilon:
+    type: float
+    aka: ["ε"]
+  bias:
+    type: float
+    option: '--bias <bias>'
+  r:
+    type: uint
+    option: '--diff <r>'
+    batch: max

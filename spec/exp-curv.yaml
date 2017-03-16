@@ -1,0 +1,12 @@
+---
+jobs:
+  - run: curv
+    parameters:
+      k: 100
+      graph: ["data/inf-max/ca-GrQc.bin", "data/inf-max/phy.bin"]
+      problem: ["ssa_ic", "ssa_lt", "imm_ic", "imm_lt", "robust_ic_lt"]
+      delta: 0.96
+      delta2: 0.994764397
+      epsilon: 0.005
+      bias: {from: 0, to: 1, step: 0.1}
+      r: {from: 0, to: 100, step: 5}

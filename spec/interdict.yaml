@@ -1,0 +1,33 @@
+---
+name: interdict
+bin: target/release/interdict
+format: '<graph> <k> <epsilon> <delta> --threads <threads> --log <log>'
+outputs:
+  edges:
+    msg: "solution"
+  seeds:
+    msg: "seeds"
+fields:
+  graph:
+    type: path
+  k:
+    type: uint
+  epsilon:
+    type: float
+    aka: ["ε"]
+  delta:
+    type: float
+    aka: ["δ"]
+  random_seeds:
+    type: uint
+    option: '--random-seeds <random_seeds>'
+  random_pct:
+    type: float
+    option: '--random-pct <random_pct>'
+  skip_linear:
+    type: bool
+    aka: ["skip linear"]
+    option: '--skip-linear'
+  relgap:
+    type: float
+    option: '--rel-gap <relgap>'

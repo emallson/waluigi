@@ -1,0 +1,23 @@
+[package]
+authors = ["J David Smith <emallson@atlanis.net>"]
+name = "waluigi"
+version = "0.1.0"
+
+[[bin]]
+name = "waluigid"
+path = "src/waluigid.rs"
+
+[[bin]]
+name = "waluigi"
+path = "src/waluigi.rs"
+
+[dependencies]
+docopt = "0.7.0"
+serde = "0.9.11"
+serde_derive = "0.9.11"
+serde_json = "0.9.9"
+serde_yaml = "0.6.2"
+slog = "1.5.2"
+slog-json = "1.2.1"
+slog-stream = "1.2.0"
+slog-term = "1.5.0"

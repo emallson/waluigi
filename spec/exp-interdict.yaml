@@ -1,0 +1,16 @@
+---
+jobs:
+  - run: interdict
+    parameters:
+      k: {from: 0, to: 100, step: 10}
+      graph: ["data/interdict/polbooks.bin", "data/interdict/karate.bin", "data/interdict/dolphins.bin"]
+      epsilon: 0.05
+      delta: 0.001
+      random_pct: 0.01
+      relgap: 0.05
+    repetitions: 100
+  - run: "interdict-validate"
+    on_each: [interdict]
+    parameters:
+      epsilon: 0.01
+      delta: 0.0001
