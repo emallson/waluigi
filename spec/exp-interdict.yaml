@@ -8,7 +8,7 @@ jobs:
       delta: 0.001
       random_pct: 0.01
       relgap: 0.05
-    repetitions: 100
+    repetitions: 10
   - run: "interdict-validate"
     on_each: [interdict]
     parameters:
