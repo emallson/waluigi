@@ -13,7 +13,6 @@ extern crate itertools;
 extern crate maplit;
 
 mod structs;
-mod planner;
 mod errors;
 
 fn main() {}
