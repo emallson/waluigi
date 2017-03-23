@@ -24,6 +24,7 @@ impl FieldType {
                 self == &FieldType::Float || (self == &FieldType::UInt && f.trunc() == f)
             }
             &FieldData::Bool(_) => self == &FieldType::Bool,
+            &FieldData::Future => self == &FieldType::Str,
         }
     }
 
@@ -93,7 +94,7 @@ impl Field {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Output {
     msg: String,
@@ -112,7 +113,7 @@ pub struct Program {
 }
 
 impl Program {
-    fn cmd(&self, params: &HashMap<String, FieldData>) -> Result<String> {
+    pub fn cmd(&self, params: &HashMap<String, FieldData>) -> Result<String> {
         let mut fmt = format!("{} {}", self.bin, self.format);
         for (field, datum) in params {
             if self.fields.contains_key(field) && self.fields[field].matches(&datum) {
@@ -126,11 +127,60 @@ impl Program {
         }
         return Ok(fmt);
     }
+
+    pub fn validate_parameters(&self, params: &HashMap<String, FieldSetting>) -> Result<()> {
+        // every field must either be filled or be optional (as indicated by the option: foo field
+        // on the field object)
+        for (field, details) in &self.fields {
+            if !params.contains_key(field) && details.option.is_none() {
+                return Err(ErrorKind::MissingParameter(field.clone(), self.name.clone()).into());
+            }
+
+            if !params.contains_key(field) {
+                continue;
+            }
+
+            let ref param = params[field];
+            if !details.dtype.matches_setting(param) {
+                return Err(ErrorKind::InvalidParameterSetting(field.clone(),
+                                                              param.clone(),
+                                                              details.dtype)
+                    .into());
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_parameter_data(&self, params: &HashMap<String, FieldData>) -> Result<()> {
+        // every field must either be filled or be optional (as indicated by the option: foo field
+        // on the field object)
+        for (field, details) in &self.fields {
+            if !params.contains_key(field) && details.option.is_none() {
+                return Err(ErrorKind::MissingParameter(field.clone(), self.name.clone()).into());
+            }
+
+            if !params.contains_key(field) {
+                continue;
+            }
+
+            let ref param = params[field];
+            if !details.dtype.matches(param) {
+                return Err(ErrorKind::InvalidParameterData(field.clone(),
+                                                           param.clone(),
+                                                           details.dtype)
+                    .into());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum FieldData {
+    Future,
     Str(String),
     Float(f64),
     UInt(usize),
@@ -160,6 +210,7 @@ impl ToString for FieldData {
             &FieldData::UInt(v) => v.to_string(),
             &FieldData::Float(v) => v.to_string(),
             &FieldData::Bool(v) => v.to_string(),
+            &FieldData::Future => "".to_string(),
         }
     }
 }
@@ -224,30 +275,6 @@ pub struct Job {
 impl Job {
     pub fn has_depends(&self) -> bool {
         self.on_each.is_some()
-    }
-
-    pub fn validate_parameters(&self, program: &Program) -> Result<()> {
-        // every field must either be filled or be optional (as indicated by the option: foo field
-        // on the field object)
-        for (field, details) in &program.fields {
-            if !self.parameters.contains_key(field) && details.option.is_none() {
-                return Err(ErrorKind::MissingParameter(field.clone(), self.run.clone()).into());
-            }
-
-            if !self.parameters.contains_key(field) {
-                continue;
-            }
-
-            let ref param = self.parameters[field];
-            if !details.dtype.matches_setting(param) {
-                return Err(ErrorKind::InvalidParameterSetting(field.clone(),
-                                                              param.clone(),
-                                                              details.dtype)
-                    .into());
-            }
-        }
-
-        Ok(())
     }
 
     pub fn batch(&self) -> Result<Vec<HashMap<String, FieldData>>> {
@@ -331,7 +358,7 @@ impl Experiment {
             }
 
             if !job.has_depends() {
-                job.validate_parameters(&programs[&job.run])?;
+                programs[&job.run].validate_parameters(&job.parameters)?;
                 jobmap.insert(job.run.clone(),
                               job.batch()?
                                   .into_iter()
@@ -354,6 +381,11 @@ impl Experiment {
                                     let mut p = params.clone();
                                     let mut pd = par_deps.clone();
                                     p.extend(dep_params.params.clone().into_iter());
+                                    p.extend(programs[dep]
+                                        .outputs
+                                        .clone()
+                                        .into_iter()
+                                        .map(|(k, _)| (k, FieldData::Future)));
                                     pd.push(dep_params.id.unwrap());
                                     (p, pd)
                                 })
@@ -364,9 +396,12 @@ impl Experiment {
 
                 jobmap.insert(job.run.clone(),
                               batch.into_iter()
-                                  .map(|(params, deps)| jobify(&programs[&job.run], params, deps))
+                                  .map(|(params, deps)| {
+                                      programs[&job.run]
+                                          .validate_parameter_data(&params)
+                                          .and_then(|_| jobify(&programs[&job.run], params, deps))
+                                  })
                                   .collect::<Result<_>>()?);
-                // TODO: validate resulting parameters
             }
         }
 
@@ -518,7 +553,7 @@ mod test {
             .unwrap();
 
         for job in &exp.jobs {
-            job.validate_parameters(&prog).unwrap();
+            prog.validate_parameters(&job.parameters).unwrap();
         }
     }
 
@@ -530,7 +565,7 @@ mod test {
             serde_yaml::from_reader(File::open("spec/exp-interdict.yaml").unwrap()).unwrap();
 
         for job in &exp.jobs {
-            job.validate_parameters(&prog).unwrap();
+            prog.validate_parameters(&job.parameters).unwrap();
         }
     }
 
