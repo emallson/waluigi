@@ -14,9 +14,11 @@ path = "src/waluigi.rs"
 [dependencies]
 docopt = "0.7.0"
 error-chain = "0.10.0"
+glob = "0.2.11"
 itertools = "0.5.9"
 maplit = "0.1.4"
 regex = "0.2.1"
+rustc-serialize = "0.3.23"
 serde = "0.9.11"
 serde_derive = "0.9.11"
 serde_json = "0.9.9"
@@ -25,6 +27,8 @@ slog = "1.5.2"
 slog-json = "1.2.1"
 slog-stream = "1.2.0"
 slog-term = "1.5.0"
+
+[profile]
 
 [profile.dev]
 opt-level = 2

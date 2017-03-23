@@ -11,7 +11,8 @@ error_chain! {
     }
     
     foreign_links {
-
+        IO(::std::io::Error);
+        Yaml(::serde_yaml::Error);
     }
 
     errors {

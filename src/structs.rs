@@ -105,7 +105,7 @@ pub struct Output {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Program {
-    name: String,
+    pub name: String,
     bin: String,
     format: String,
     outputs: HashMap<String, Output>,
@@ -116,11 +116,13 @@ impl Program {
     pub fn cmd(&self, params: &HashMap<String, FieldData>) -> Result<String> {
         let mut fmt = format!("{} {}", self.bin, self.format);
         for (field, datum) in params {
-            if self.fields.contains_key(field) && self.fields[field].matches(&datum) {
+            if self.fields.contains_key(field) && datum != &FieldData::Future &&
+               self.fields[field].matches(&datum) {
                 if self.fields[field].option.is_none() {
                     let fname = format!("<{}>", field);
                     fmt = fmt.replace(&fname, &self.fields[field].fill_with(datum)?);
                 } else {
+                    fmt.push_str(" ");
                     fmt.push_str(&self.fields[field].fill_with(datum)?);
                 }
             }
@@ -177,7 +179,7 @@ impl Program {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum FieldData {
     Future,
@@ -337,15 +339,16 @@ impl Experiment {
                 -> Result<Vec<JobInstance>> {
         let mut id = 0;
         let mut jobify = |prog: &Program, params, deps| {
-            let inst = JobInstance {
+            let mut inst = JobInstance {
                 id: Some(id),
                 command: try!(prog.cmd(&params)),
                 params: params,
-                log: "".to_string(),
+                log: None,
                 threads: threads,
                 depends: deps,
             };
 
+            inst.apply("threads", FieldData::UInt(threads))?;
             id += 1;
             Ok(inst)
         };
@@ -417,9 +420,16 @@ pub struct JobInstance {
     id: Option<usize>,
     command: String,
     params: HashMap<String, FieldData>,
-    log: String,
+    log: Option<String>,
     depends: Vec<usize>,
     threads: usize,
+}
+
+impl JobInstance {
+    pub fn apply(&mut self, param: &str, datum: FieldData) -> Result<()> {
+        self.command = self.command.replace(&format!("<{}>", param), &datum.to_string());
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -480,32 +490,33 @@ mod test {
 
     #[test]
     fn deser_problem_curv() {
-        let _prob: Program = serde_yaml::from_reader(File::open("spec/curv.yaml").unwrap())
+        let _prob: Program = serde_yaml::from_reader(File::open("programs/curv.yaml").unwrap())
             .unwrap();
     }
 
     #[test]
     fn deser_problem_interdict() {
-        let _prob: Program = serde_yaml::from_reader(File::open("spec/interdict.yaml").unwrap())
-            .unwrap();
+        let _prob: Program =
+            serde_yaml::from_reader(File::open("programs/interdict.yaml").unwrap()).unwrap();
     }
 
     #[test]
     fn deser_problem_interdict_validate() {
         let _prob: Program =
-            serde_yaml::from_reader(File::open("spec/interdict-validate.yaml").unwrap()).unwrap();
+            serde_yaml::from_reader(File::open("programs/interdict-validate.yaml").unwrap())
+                .unwrap();
     }
 
     #[test]
     fn deser_exp_curv() {
-        let _prob: Experiment = serde_yaml::from_reader(File::open("spec/exp-curv.yaml").unwrap())
-            .unwrap();
+        let _prob: Experiment =
+            serde_yaml::from_reader(File::open("programs/exp-curv.yaml").unwrap()).unwrap();
     }
 
     #[test]
     fn deser_exp_interdict() {
         let _prob: Experiment =
-            serde_yaml::from_reader(File::open("spec/exp-interdict.yaml").unwrap()).unwrap();
+            serde_yaml::from_reader(File::open("programs/exp-interdict.yaml").unwrap()).unwrap();
     }
 
     #[test]
@@ -548,9 +559,10 @@ mod test {
 
     #[test]
     fn job_validate_curv() {
-        let prog: Program = serde_yaml::from_reader(File::open("spec/curv.yaml").unwrap()).unwrap();
-        let exp: Experiment = serde_yaml::from_reader(File::open("spec/exp-curv.yaml").unwrap())
+        let prog: Program = serde_yaml::from_reader(File::open("programs/curv.yaml").unwrap())
             .unwrap();
+        let exp: Experiment =
+            serde_yaml::from_reader(File::open("programs/exp-curv.yaml").unwrap()).unwrap();
 
         for job in &exp.jobs {
             prog.validate_parameters(&job.parameters).unwrap();
@@ -560,9 +572,10 @@ mod test {
     #[test]
     #[should_panic]
     fn job_invalid_curv() {
-        let prog: Program = serde_yaml::from_reader(File::open("spec/curv.yaml").unwrap()).unwrap();
+        let prog: Program = serde_yaml::from_reader(File::open("programs/curv.yaml").unwrap())
+            .unwrap();
         let exp: Experiment =
-            serde_yaml::from_reader(File::open("spec/exp-interdict.yaml").unwrap()).unwrap();
+            serde_yaml::from_reader(File::open("programs/exp-interdict.yaml").unwrap()).unwrap();
 
         for job in &exp.jobs {
             prog.validate_parameters(&job.parameters).unwrap();
@@ -571,8 +584,8 @@ mod test {
 
     #[test]
     fn job_batch_curv() {
-        let exp: Experiment = serde_yaml::from_reader(File::open("spec/exp-curv.yaml").unwrap())
-            .unwrap();
+        let exp: Experiment =
+            serde_yaml::from_reader(File::open("programs/exp-curv.yaml").unwrap()).unwrap();
 
         for job in &exp.jobs {
             let batch = job.batch().unwrap();
@@ -583,7 +596,7 @@ mod test {
     #[test]
     fn job_batch_interdict() {
         let exp: Experiment =
-            serde_yaml::from_reader(File::open("spec/exp-interdict.yaml").unwrap()).unwrap();
+            serde_yaml::from_reader(File::open("programs/exp-interdict.yaml").unwrap()).unwrap();
 
         for (job, &size) in exp.jobs.iter().zip(&vec![330, 1]) {
             let batch = job.batch().unwrap();
@@ -594,9 +607,10 @@ mod test {
 
     #[test]
     fn plan_curv() {
-        let prog: Program = serde_yaml::from_reader(File::open("spec/curv.yaml").unwrap()).unwrap();
-        let exp: Experiment = serde_yaml::from_reader(File::open("spec/exp-curv.yaml").unwrap())
+        let prog: Program = serde_yaml::from_reader(File::open("programs/curv.yaml").unwrap())
             .unwrap();
+        let exp: Experiment =
+            serde_yaml::from_reader(File::open("programs/exp-curv.yaml").unwrap()).unwrap();
 
         let map = hashmap!{
             "curv".to_string() => prog,
@@ -607,12 +621,13 @@ mod test {
 
     #[test]
     fn plan_interdict() {
-        let prog: Program = serde_yaml::from_reader(File::open("spec/interdict.yaml").unwrap())
+        let prog: Program = serde_yaml::from_reader(File::open("programs/interdict.yaml").unwrap())
             .unwrap();
         let validate: Program =
-            serde_yaml::from_reader(File::open("spec/interdict-validate.yaml").unwrap()).unwrap();
+            serde_yaml::from_reader(File::open("programs/interdict-validate.yaml").unwrap())
+                .unwrap();
         let exp: Experiment =
-            serde_yaml::from_reader(File::open("spec/exp-interdict.yaml").unwrap()).unwrap();
+            serde_yaml::from_reader(File::open("programs/exp-interdict.yaml").unwrap()).unwrap();
 
         let map = hashmap!{
             "interdict".to_string() => prog,
